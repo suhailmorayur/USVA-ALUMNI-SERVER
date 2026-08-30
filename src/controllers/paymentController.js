@@ -90,18 +90,16 @@ const submitProof = async (req, res) => {
     console.log(`Generating Landscape card PDF for member ID: ${membershipId}...`);
     const landscapePdfBuffer = await pdfService.generateMemberPDF(member, validity, 'landscape');
     
-    // Upload PDF files to Cloudinary
-    console.log('Uploading PDFs to Cloudinary...');
     const cloudinaryResponse = await cloudinaryService.uploadBuffer(
       pdfBuffer,
       'usva_pdfs',
-      `USVA_Membership_${membershipId}`,
+      `USVA_Membership_${membershipId}.pdf`,
       'raw'
     );
     const cloudinaryLandscapeResponse = await cloudinaryService.uploadBuffer(
       landscapePdfBuffer,
       'usva_pdfs',
-      `USVA_Membership_Landscape_${membershipId}`,
+      `USVA_Membership_Landscape_${membershipId}.pdf`,
       'raw'
     );
 

@@ -303,13 +303,13 @@ const approveMember = async (req, res) => {
     const cloudinaryResponse = await cloudinaryService.uploadBuffer(
       pdfBuffer,
       'usva_pdfs',
-      `USVA_Membership_${membershipId}`,
+      `USVA_Membership_${membershipId}.pdf`,
       'raw'
     );
     const cloudinaryLandscapeResponse = await cloudinaryService.uploadBuffer(
       landscapePdfBuffer,
       'usva_pdfs',
-      `USVA_Membership_Landscape_${membershipId}`,
+      `USVA_Membership_Landscape_${membershipId}.pdf`,
       'raw'
     );
 
@@ -440,13 +440,13 @@ const regenerateCard = async (req, res) => {
     const cloudinaryResponse = await cloudinaryService.uploadBuffer(
       pdfBuffer,
       'usva_pdfs',
-      `USVA_Membership_${member.membershipId}`,
+      `USVA_Membership_${member.membershipId}.pdf`,
       'raw'
     );
     const cloudinaryLandscapeResponse = await cloudinaryService.uploadBuffer(
       landscapePdfBuffer,
       'usva_pdfs',
-      `USVA_Membership_Landscape_${member.membershipId}`,
+      `USVA_Membership_Landscape_${member.membershipId}.pdf`,
       'raw'
     );
 
@@ -765,8 +765,8 @@ const deleteMember = async (req, res) => {
     if (member.membershipId) {
       console.log(`Deleting compiled card PDFs from Cloudinary for ID: ${member.membershipId}`);
       try {
-        await cloudinaryService.deleteImage(`usva_pdfs/USVA_Membership_${member.membershipId}`, 'raw');
-        await cloudinaryService.deleteImage(`usva_pdfs/USVA_Membership_Landscape_${member.membershipId}`, 'raw');
+        await cloudinaryService.deleteImage(`usva_pdfs/USVA_Membership_${member.membershipId}.pdf`, 'raw');
+        await cloudinaryService.deleteImage(`usva_pdfs/USVA_Membership_Landscape_${member.membershipId}.pdf`, 'raw');
       } catch (err) {
         console.error('Failed to delete PDF cards from Cloudinary:', err.message);
       }
