@@ -1,5 +1,7 @@
 const Member = require('../models/Member');
 const MembershipCard = require('../models/MembershipCard');
+const Settings = require('../models/Settings');
+const pdfService = require('../services/pdfService');
 const { uploadImage } = require('../services/cloudinaryService');
 
 /**
@@ -267,11 +269,54 @@ const getPublicMemberProfile = async (req, res) => {
   }
 };
 
+const downloadPortraitCard = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const member = await Member.findById(id);
+    if (!member) {
+      return res.status(404).json({ success: false, message: 'Member profile not found' });
+    }
+
+    if (!['approved', 'card_generated', 'email_sent'].includes(member.applicationStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Membership card has not been compiled yet. Please verify approval status.'
+      });
+    }
+
+    const settings = await Settings.findOne();
+    const validity = settings ? settings.membershipValidity : 'Mar 2028';
+
+    // Generate portrait PDF card on the fly
+    console.log(`Generating direct Portrait card PDF on download request for: ${member.fullName}`);
+    const pdfBuffer = await pdfService.generateMemberPDF(member, validity, 'portrait');
+
+    // Format safe name (replacing special characters and spaces with underscores)
+    const safeName = member.fullName
+      .trim()
+      .replace(/[^a-zA-Z0-9]/g, '_')
+      .replace(/__+/g, '_');
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}_Portrait_Card.pdf"`);
+    res.status(200).send(pdfBuffer);
+
+  } catch (error) {
+    console.error('Download portrait controller error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error generating Portrait card: ' + error.message
+    });
+  }
+};
+
 module.exports = {
   getCardDetails,
   checkStatus,
   uploadPhoto,
   createMemberProfile,
   searchCard,
-  getPublicMemberProfile
+  getPublicMemberProfile,
+  downloadPortraitCard
 };
