@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const dotenv = require('dotenv');
 const path = require('path');
+const fs = require('fs');
 const connectDB = require('./config/db');
 
 // Load environment variables
@@ -105,11 +106,12 @@ app.use('/api/verify', verifyRoutes);
 // Public settings retrieval endpoint
 app.get('/api/settings', getSettings);
 
-// Serve static assets if in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../../client/dist')));
+// Serve static assets if in production and client folder is built locally
+const distPath = path.resolve(__dirname, '../../client/dist');
+if (process.env.NODE_ENV === 'production' && fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
   app.get('*', (req, res) => {
-    res.sendFile(path.resolve(__dirname, '../../client', 'dist', 'index.html'));
+    res.sendFile(path.join(distPath, 'index.html'));
   });
 } else {
   app.get('/', (req, res) => {
