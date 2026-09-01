@@ -57,26 +57,29 @@ const submitProof = async (req, res) => {
 
     // 1. Safe Sequence / Counter Mechanism for unique Membership ID
     // Format: ALUMNI-YYYY-00001
-    const currentYear = new Date().getFullYear();
-    const prefix = `ALUMNI-${currentYear}-`;
-    
-    // Sort in descending order to get the highest sequence number in the database
-    const latestMember = await Member.findOne({
-      membershipId: { $regex: '^' + prefix }
-    }).sort({ membershipId: -1 });
+    let membershipId = member.membershipId;
+    if (!membershipId) {
+      const currentYear = new Date().getFullYear();
+      const prefix = `ALUMNI-${currentYear}-`;
+      
+      // Sort in descending order to get the highest sequence number in the database
+      const latestMember = await Member.findOne({
+        membershipId: { $regex: '^' + prefix }
+      }).sort({ membershipId: -1 });
 
-    let nextSeq = 1;
-    if (latestMember && latestMember.membershipId) {
-      const parts = latestMember.membershipId.split('-');
-      const lastSeq = parseInt(parts[2], 10);
-      if (!isNaN(lastSeq)) {
-        nextSeq = lastSeq + 1;
+      let nextSeq = 1;
+      if (latestMember && latestMember.membershipId) {
+        const parts = latestMember.membershipId.split('-');
+        const lastSeq = parseInt(parts[2], 10);
+        if (!isNaN(lastSeq)) {
+          nextSeq = lastSeq + 1;
+        }
       }
+
+      membershipId = `${prefix}${String(nextSeq).padStart(5, '0')}`;
+      member.membershipId = membershipId;
     }
 
-    const membershipId = `${prefix}${String(nextSeq).padStart(5, '0')}`;
-
-    member.membershipId = membershipId;
     member.paymentStatus = 'paid';
     member.applicationStatus = 'approved';
     await member.save();

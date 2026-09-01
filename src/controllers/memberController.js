@@ -68,6 +68,8 @@ const checkStatus = async (req, res) => {
     res.json({
       success: true,
       data: {
+        _id: member._id,
+        admissionNumber: member.admissionNumber,
         fullName: maskName(member.fullName),
         applicationStatus: member.applicationStatus,
         paymentStatus: member.paymentStatus,
@@ -144,9 +146,19 @@ const createMemberProfile = async (req, res) => {
     });
 
     if (existing) {
+      if (existing.paymentStatus !== 'paid' && !['approved', 'card_generated', 'email_sent'].includes(existing.applicationStatus)) {
+        // Return existing profile so student can resume checkout seamlessly
+        return res.status(200).json({
+          success: true,
+          message: 'Existing application found. Resuming payment...',
+          data: existing,
+          resumed: true
+        });
+      }
+
       return res.status(400).json({
         success: false,
-        message: 'A profile with this email or admission number already exists'
+        message: 'A profile with this email or admission number already exists and has been approved.'
       });
     }
 

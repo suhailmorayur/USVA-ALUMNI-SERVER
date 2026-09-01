@@ -7,6 +7,11 @@ const axios = require('axios');
  * Downloads an image from a URL as an ArrayBuffer
  */
 const downloadImageBuffer = async (url) => {
+  if (!url) throw new Error('No image URL provided');
+  if (url.startsWith('data:')) {
+    const base64Data = url.split(',')[1];
+    return Buffer.from(base64Data, 'base64');
+  }
   try {
     const response = await axios.get(url, { responseType: 'arraybuffer' });
     return Buffer.from(response.data);
@@ -105,8 +110,7 @@ const generateMemberPDF = async (member, validity = 'Mar 2028', layout = 'portra
 
     // Coordinate Math based on Layout
     if (layout === 'portrait') {
-      // 1. Mask validity text area "Valid up to Mar 2028" in the top right box
-      // Solid background color at validity box: #08aed0 (rgb: 8, 170, 208)
+      // 1. Mask validity text area in the top right box (solid background color #08aed0)
       const valBoxWidth = 220;
       const valBoxHeight = 62;
       const valBoxX = 388;
@@ -120,46 +124,16 @@ const generateMemberPDF = async (member, validity = 'Mar 2028', layout = 'portra
         color: rgb(8 / 255, 170 / 255, 208 / 255)
       });
 
-      // Draw validity text (Centered inside validity box)
-      const validityText = `Valid up to ${validity}`;
-      const valTextWidth = helvetica.widthOfTextAtSize(validityText, 13);
-      const valX = valBoxX + (valBoxWidth - valTextWidth) / 2;
-      page1.drawText(validityText, {
-        x: valX,
-        y: valBoxY + 24,
-        size: 13,
-        font: helvetica,
-        color: rgb(1, 1, 1)
-      });
-
-      // 2. Student Photo Box (Reference coordinates)
-      const containerX = 93;
-      const containerY = 1004 - 210 - 274; // bottom-up Y from top-down Y=210 and height=274
-      const containerWidth = 209;
-      const containerHeight = 274;
-      const borderWidth = 8;
-
-      // Draw white container card behind photo
-      page1.drawRectangle({
-        x: containerX,
-        y: containerY,
-        width: containerWidth,
-        height: containerHeight,
-        color: rgb(1, 1, 1)
-      });
-
-      // Draw photo inside container card
-      const photoX = containerX + borderWidth;
-      const photoY = containerY + borderWidth;
-      const photoWidth = containerWidth - (2 * borderWidth);
-      const photoHeight = containerHeight - (2 * borderWidth);
+      // 2. Student Photo Box (Extended directly to edges with 28px rounded corners, no white border)
+      const photoX = 93;
+      const photoY = 1004 - 210 - 274; // bottom-up Y from top-down Y=210 and height=274
+      const photoWidth = 209;
+      const photoHeight = 274;
 
       try {
         const photoBuffer = await downloadImageBuffer(member.photoUrl);
-        const isPng = member.photoUrl.toLowerCase().endsWith('.png');
-        const studentPhoto = isPng 
-          ? await pdfDoc.embedPng(photoBuffer) 
-          : await pdfDoc.embedJpg(photoBuffer);
+        const roundedPhotoBuffer = await roundImageCorners(photoBuffer, photoWidth, photoHeight, 28);
+        const studentPhoto = await pdfDoc.embedPng(roundedPhotoBuffer);
 
         page1.drawImage(studentPhoto, {
           x: photoX,
@@ -169,13 +143,32 @@ const generateMemberPDF = async (member, validity = 'Mar 2028', layout = 'portra
         });
       } catch (photoError) {
         console.error('Failed to embed portrait photo, using placeholder:', photoError.message);
-        page1.drawRectangle({
-          x: photoX,
-          y: photoY,
-          width: photoWidth,
-          height: photoHeight,
-          color: rgb(0.95, 0.95, 0.95)
-        });
+        try {
+          const placeholderBuffer = await sharp({
+            create: {
+              width: photoWidth,
+              height: photoHeight,
+              channels: 3,
+              background: { r: 242, g: 242, b: 242 }
+            }
+          }).png().toBuffer();
+          const roundedPlaceholder = await roundImageCorners(placeholderBuffer, photoWidth, photoHeight, 28);
+          const placeholderPhoto = await pdfDoc.embedPng(roundedPlaceholder);
+          page1.drawImage(placeholderPhoto, {
+            x: photoX,
+            y: photoY,
+            width: photoWidth,
+            height: photoHeight
+          });
+        } catch (err) {
+          page1.drawRectangle({
+            x: photoX,
+            y: photoY,
+            width: photoWidth,
+            height: photoHeight,
+            color: rgb(0.95, 0.95, 0.95)
+          });
+        }
       }
 
       // 3. Student Name (Reference specifications)
