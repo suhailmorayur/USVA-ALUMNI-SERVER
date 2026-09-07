@@ -56,11 +56,11 @@ const submitProof = async (req, res) => {
     });
 
     // 1. Safe Sequence / Counter Mechanism for unique Membership ID
-    // Format: ALUMNI-YYYY-00001
+    // Format: YYYY/UA0001 (e.g. 2026/UA0001)
     let membershipId = member.membershipId;
     if (!membershipId) {
       const currentYear = new Date().getFullYear();
-      const prefix = `ALUMNI-${currentYear}-`;
+      const prefix = `${currentYear}/UA`;
       
       // Sort in descending order to get the highest sequence number in the database
       const latestMember = await Member.findOne({
@@ -69,14 +69,14 @@ const submitProof = async (req, res) => {
 
       let nextSeq = 1;
       if (latestMember && latestMember.membershipId) {
-        const parts = latestMember.membershipId.split('-');
-        const lastSeq = parseInt(parts[2], 10);
+        const seqStr = latestMember.membershipId.replace(prefix, '');
+        const lastSeq = parseInt(seqStr, 10);
         if (!isNaN(lastSeq)) {
           nextSeq = lastSeq + 1;
         }
       }
 
-      membershipId = `${prefix}${String(nextSeq).padStart(5, '0')}`;
+      membershipId = `${prefix}${String(nextSeq).padStart(4, '0')}`;
       member.membershipId = membershipId;
     }
 
@@ -93,22 +93,23 @@ const submitProof = async (req, res) => {
     console.log(`Generating Landscape card PDF for member ID: ${membershipId}...`);
     const landscapePdfBuffer = await pdfService.generateMemberPDF(member, validity, 'landscape');
     
+    const safeFileId = membershipId.replace(/\//g, '_');
     const cloudinaryResponse = await cloudinaryService.uploadBuffer(
       pdfBuffer,
       'usva_pdfs',
-      `USVA_Membership_${membershipId}.pdf`,
+      `USVA_Membership_${safeFileId}.pdf`,
       'raw'
     );
     const cloudinaryLandscapeResponse = await cloudinaryService.uploadBuffer(
       landscapePdfBuffer,
       'usva_pdfs',
-      `USVA_Membership_Landscape_${membershipId}.pdf`,
+      `USVA_Membership_Landscape_${safeFileId}.pdf`,
       'raw'
     );
 
     // Save/Update Card document
     const frontendUrl = process.env.FRONTEND_URL || 'https://usva-alumni.org';
-    const qrVerificationUrl = `${frontendUrl}/verify/${membershipId}`;
+    const qrVerificationUrl = `${frontendUrl}/verify/${encodeURIComponent(membershipId)}`;
 
     const card = await MembershipCard.findOneAndUpdate(
       { memberId: member._id },

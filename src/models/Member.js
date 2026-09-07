@@ -19,9 +19,8 @@ const memberSchema = new mongoose.Schema(
     },
     admissionNumber: {
       type: String,
-      required: true,
-      unique: true,
-      trim: true
+      trim: true,
+      default: ''
     },
     phone: {
       type: String,

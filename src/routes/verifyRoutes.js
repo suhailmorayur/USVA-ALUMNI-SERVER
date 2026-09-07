@@ -7,11 +7,12 @@ const Settings = require('../models/Settings');
  * Public Verification route
  * GET /api/verify/:membershipId
  */
-router.get('/:membershipId', async (req, res) => {
-  const { membershipId } = req.params;
+router.get('/*', async (req, res) => {
+  const rawId = req.params[0] || req.params.membershipId || '';
+  const membershipId = decodeURIComponent(rawId).trim().toUpperCase();
 
   try {
-    const member = await Member.findOne({ membershipId: membershipId.trim().toUpperCase() });
+    const member = await Member.findOne({ membershipId });
     
     if (!member) {
       return res.status(404).json({

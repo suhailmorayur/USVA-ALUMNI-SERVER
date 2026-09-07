@@ -36,22 +36,29 @@ const getCardDetails = async (req, res) => {
  * GET /api/members/status-check
  */
 const checkStatus = async (req, res) => {
-  const { admissionNumber } = req.query;
+  const { admissionNumber, email } = req.query;
 
   try {
-    if (!admissionNumber) {
+    if (!admissionNumber && !email) {
       return res.status(400).json({
         success: false,
-        message: 'Admission number is required'
+        message: 'Please provide either an admission number or an email address.'
       });
     }
 
-    const member = await Member.findOne({ admissionNumber: admissionNumber.trim() });
+    const query = {};
+    if (admissionNumber && admissionNumber.trim()) {
+      query.admissionNumber = admissionNumber.trim();
+    } else if (email && email.trim()) {
+      query.email = email.trim().toLowerCase();
+    }
+
+    const member = await Member.findOne(query);
     
     if (!member) {
       return res.status(404).json({
         success: false,
-        message: 'No registration found for this admission number. Please register first.'
+        message: 'No registration found for the provided details. Please register first.'
       });
     }
 
@@ -69,7 +76,7 @@ const checkStatus = async (req, res) => {
       success: true,
       data: {
         _id: member._id,
-        admissionNumber: member.admissionNumber,
+        admissionNumber: member.admissionNumber || '',
         fullName: maskName(member.fullName),
         applicationStatus: member.applicationStatus,
         paymentStatus: member.paymentStatus,
@@ -128,7 +135,7 @@ const createMemberProfile = async (req, res) => {
   const { fullName, sand, place, admissionNumber, phone, email, photoUrl, photoPublicId } = req.body;
 
   try {
-    if (!fullName || !place || !admissionNumber || !phone || !email || !photoUrl) {
+    if (!fullName || !place || !phone || !email || !photoUrl) {
       return res.status(400).json({
         success: false,
         message: 'Missing required profile fields'
@@ -136,13 +143,15 @@ const createMemberProfile = async (req, res) => {
     }
 
     const trimmedEmail = email.trim().toLowerCase();
-    const trimmedAdNo = admissionNumber.trim();
+    const trimmedAdNo = admissionNumber ? admissionNumber.trim() : '';
+
+    const existingQueries = [{ email: trimmedEmail }];
+    if (trimmedAdNo) {
+      existingQueries.push({ admissionNumber: trimmedAdNo });
+    }
 
     const existing = await Member.findOne({
-      $or: [
-        { email: trimmedEmail },
-        { admissionNumber: trimmedAdNo }
-      ]
+      $or: existingQueries
     });
 
     if (existing) {

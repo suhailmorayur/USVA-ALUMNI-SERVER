@@ -208,12 +208,16 @@ const generateMemberPDF = async (member, validity = 'Mar 2028', layout = 'portra
       const colonX = 266;               // Colon aligned at X=266
       const valueX = 300;               // Value aligned at X=300
 
-      // Rows top-down Y values: Place=704, Ad.No=736, Phone=766
+      // Rows top-down Y values: Place=704, Ad.No=736, Phone=766, Mem.ID=796
       const details = [
         { label: 'Place', value: member.place, topDownY: 704 },
         { label: 'Ad. No', value: member.admissionNumber, topDownY: 736 },
         { label: 'Phone', value: member.phone, topDownY: 766 }
       ];
+
+      if (member.membershipId) {
+        details.push({ label: 'Mem. ID', value: member.membershipId, topDownY: 796 });
+      }
 
       details.forEach((item) => {
         const yOffset = 1004 - item.topDownY - detailSize;
@@ -237,7 +241,7 @@ const generateMemberPDF = async (member, validity = 'Mar 2028', layout = 'portra
         });
 
         // Draw value
-        page1.drawText(item.value, {
+        page1.drawText(String(item.value || '-'), {
           x: valueX,
           y: yOffset,
           size: detailSize,
@@ -336,6 +340,10 @@ const generateMemberPDF = async (member, validity = 'Mar 2028', layout = 'portra
         { label: 'Phone', value: member.phone, topDownY: 302 }
       ];
 
+      if (member.membershipId) {
+        details.push({ label: 'Mem. ID', value: member.membershipId, topDownY: 334 });
+      }
+
       details.forEach((item) => {
         const yOffset = 638 - item.topDownY - detailSize;
         
@@ -355,7 +363,7 @@ const generateMemberPDF = async (member, validity = 'Mar 2028', layout = 'portra
           color: detailColor
         });
 
-        page1.drawText(item.value, {
+        page1.drawText(String(item.value || '-'), {
           x: valueX,
           y: yOffset,
           size: detailSize,
