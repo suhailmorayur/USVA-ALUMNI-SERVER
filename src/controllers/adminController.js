@@ -218,33 +218,86 @@ const updateMember = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Member not found' });
     }
 
-    const updates = req.body;
-    const allowedUpdates = ['fullName', 'sand', 'place', 'admissionNumber', 'phone', 'email'];
+    const { fullName, sand, place, admissionNumber, phone, email } = req.body;
 
-    allowedUpdates.forEach((key) => {
-      if (updates[key] !== undefined) {
-        member[key] = updates[key];
+    // If email is being changed, ensure it's not taken by another member
+    if (email && email.trim().toLowerCase() !== member.email) {
+      const trimmedEmail = email.trim().toLowerCase();
+      const existingEmail = await Member.findOne({
+        _id: { $ne: member._id },
+        email: trimmedEmail
+      });
+      if (existingEmail) {
+        return res.status(400).json({
+          success: false,
+          message: 'Another member already exists with this email address.'
+        });
       }
-    });
+      member.email = trimmedEmail;
+    }
+
+    if (fullName !== undefined) member.fullName = fullName.trim();
+    if (place !== undefined) member.place = place.trim();
+    if (admissionNumber !== undefined) member.admissionNumber = admissionNumber.trim();
+    if (phone !== undefined) member.phone = phone.trim();
+    if (sand !== undefined) member.sand = sand;
 
     await member.save();
+
+    // If card was already generated/approved, automatically re-compile both Portrait & Landscape PDFs
+    if (member.membershipId) {
+      const settings = await Settings.findOne();
+      const validity = settings ? settings.membershipValidity : 'Mar 2028';
+
+      console.log(`Auto-regenerating cards for updated member ${member.membershipId}...`);
+      const pdfBuffer = await pdfService.generateMemberPDF(member, validity, 'portrait');
+      const landscapePdfBuffer = await pdfService.generateMemberPDF(member, validity, 'landscape');
+
+      const safeFileId = member.membershipId.replace(/\//g, '_');
+      const cloudinaryResponse = await cloudinaryService.uploadBuffer(
+        pdfBuffer,
+        'usva_pdfs',
+        `USVA_Membership_${safeFileId}.pdf`,
+        'raw'
+      );
+      const cloudinaryLandscapeResponse = await cloudinaryService.uploadBuffer(
+        landscapePdfBuffer,
+        'usva_pdfs',
+        `USVA_Membership_Landscape_${safeFileId}.pdf`,
+        'raw'
+      );
+
+      const card = await MembershipCard.findOne({ memberId: member._id });
+      const currentVersion = card ? card.version : 0;
+
+      await MembershipCard.findOneAndUpdate(
+        { memberId: member._id },
+        {
+          pdfUrl: cloudinaryResponse.url,
+          landscapePdfUrl: cloudinaryLandscapeResponse.url,
+          generatedAt: new Date(),
+          version: currentVersion + 1
+        },
+        { upsert: true, new: true }
+      );
+    }
 
     await AuditLog.create({
       adminId: req.admin._id,
       action: 'update_member_details',
       memberId: member._id,
-      metadata: { updates }
+      metadata: { updates: req.body }
     });
 
     res.json({
       success: true,
-      message: 'Member details updated successfully',
+      message: 'Member details updated successfully' + (member.membershipId ? ' and cards re-compiled.' : '.'),
       data: member
     });
 
   } catch (error) {
     console.error('Admin update member error:', error);
-    res.status(500).json({ success: false, message: 'Server error updating member details' });
+    res.status(500).json({ success: false, message: 'Server error updating member details: ' + error.message });
   }
 };
 
